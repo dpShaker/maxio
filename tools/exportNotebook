@@ -19,6 +19,15 @@ bad_args=""
 arg_num=0
 KEEP_TEMPDIR=""
 
+###
+
+INKSCAPE=/usr/bin/inkscape
+CONVERT=/usr/bin/convert
+RSVG_CONVERT=/usr/bin/rsvg-convert
+PDFTK=/usr/bin/pdftk
+SSH=/usr/bin/ssh
+SCP=/usr/bin/scp
+
 while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
@@ -160,9 +169,9 @@ else
 
     # Establish remote connection
     SSH_REMOTE="root@${SSH_HOST}"
-    SSH_CMD="ssh -S remarkable-ssh"
-    SCP_CMD="scp -o ControlPath=remarkable-ssh"
-    ${SSH_CMD} -o ConnectTimeout=${SSH_TIMEOUT} -M -f -q ${SSH_REMOTE} -N
+    SSH_CMD="$SSH -S remarkable-ssh"
+    SCP_CMD="$SCP -o ControlPath=remarkable-ssh"
+    ${SSH_CMD} -o ConnectTimeout=${SSH_TIMEOUT} -M -f -q ${SSH_REMOTE} -N &
     [ ! $? -eq 0 ] && echo "Failed to establish connection with the device!" && exit 1
 
     # Search for given pattern
@@ -335,28 +344,29 @@ if command -v "svgo" > /dev/null; then
 fi
 
 # Convert svg to pdf
-if command -v "inkscape" > /dev/null; then
+if command -v $INKSCAPE > /dev/null; then
     for f in "${tmpfolder}"/foreground*.svg; do
-        inkscape "$f" -d 200 --export-pdf="${f%.svg}.pdf"
+        $INKSCAPE "$f" -d 200 --export-pdf="${f%.svg}.pdf"
         [ ! $? -eq 0 ] && echo "Failed to convert to pdf via inkscape '$f'" && exit 1
     done
-    pdftk "${tmpfolder}"/foreground*.pdf cat output "${tmpfolder}"/foreground.pdf
+    $PDFTK "${tmpfolder}"/foreground*.pdf cat output "${tmpfolder}"/foreground.pdf
     [ ! $? -eq 0 ] && echo "Failed to merge inkscape pdfs" && exit 1
-elif command -v "rsvg-convert" > /dev/null; then
-    rsvg-convert -a -f pdf "${tmpfolder}"/foreground*.svg -o "${tmpfolder}"/foreground.pdf
+elif command -v $RSVG_CONVERT > /dev/null; then
+    $RSVG_CONVERT -a -f pdf "${tmpfolder}"/foreground*.svg -o "${tmpfolder}"/foreground.pdf
     [ ! $? -eq 0 ] && echo "Failed to convert to pdf via rsvg-convert" && exit 1
 else
-    convert -density 100 "${tmpfolder}"/foreground*.svg -transparent white "${tmpfolder}"/foreground.pdf
+    $CONVERT -density 100 "${tmpfolder}"/foreground*.svg -transparent white "${tmpfolder}"/foreground.pdf
     [ ! $? -eq 0 ] && echo "Failed to convert to pdf via convert" && exit 1
 fi
 
 # Use multistamp instead of multibackground to preserve transparency
-pdftk "${tmpfolder}"/background.pdf multistamp "${tmpfolder}"/foreground.pdf output "${filename}.pdf"
+$PDFTK "${tmpfolder}"/background.pdf multistamp "${tmpfolder}"/foreground.pdf output "${filename}.pdf"
 [ ! $? -eq 0 ] && echo "Failed to merge background and foreground pdfs" && exit 1
 
 filesize=$(ls -la "${filename}.pdf" | awk '{print $5}' | numfmt --to=iec-i --suffix=B --format="%.3f")
 
 echo "Written ${filesize} to ${filename}.pdf"
+
 
 if [ -z $KEEP_TEMPDIR ]; then
     rm -Rf "${tmpfolder}"
