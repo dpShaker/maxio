@@ -368,7 +368,7 @@ fi
 # Convert svg to pdf
 if command -v $INKSCAPE > /dev/null; then
     for f in "${tmpfolder}"/foreground*.svg; do
-        $INKSCAPE "$f" -d 200 --export-pdf="${f%.svg}.pdf"
+        $INKSCAPE "$f" -d 200 --export-type=pdf --export-filename="${f%.svg}.pdf"
         [ ! $? -eq 0 ] && echo "Failed to convert to pdf via inkscape '$f'" && exit 1
     done
     $PDFTK "${tmpfolder}"/foreground*.pdf cat output "${tmpfolder}"/foreground.pdf
