@@ -13,7 +13,7 @@ COLOR_ANNOTATIONS=""
 SSH_HOST="10.11.99.1"
 SSH_TIMEOUT=1
 path=""
-STROKE_WIDTH="3"
+STROKE_WIDTH="1"
 OPACITY="1"
 bad_args=""
 arg_num=0
@@ -85,7 +85,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $bad_args == TRUE || $arg_num < 1 ]]; then
-    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w INT] [--opacity|-o FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
+    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
     exit 1
 fi
 
@@ -354,7 +354,19 @@ done
 for f in "${tmpfolder}"/foreground*.svg; do
     # debug
     #cp -v "$f" ~/debug/"$(basename "$f")" 
-    sed -i "s/stroke-width\:[\.0-9]\+/stroke-width:${STROKE_WIDTH}/g;s/opacity\:[\.0-9]\+/opacity:${OPACITY}/g" "$f"
+    sw=$(grep -o "stroke-width\:[\.0-9]\+" "$f" | awk -F: '{print $2}')
+    if [ -z ${sw} ]; then
+        continue
+    fi
+    sw=$(echo "$sw * ${STROKE_WIDTH}" | bc)
+
+    op=$(grep -o "opacity\:[\.0-9]\+" "$f" | awk -F: '{print $2}')
+    if [ -z ${op} ]; then
+        continue
+    fi
+    op=$(echo "$op * ${OPACITY}" | bc)
+
+    sed -i "s/stroke-width\:[\.0-9]\+/stroke-width:${sw}/g;s/opacity\:[\.0-9]\+/opacity:${op}/g" "$f"
     [ ! $? -eq 0 ] && echo "Failed to reset stroke-width and opacity in '$f'" && exit 1
 done
 # - optimize svg with svgo
