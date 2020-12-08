@@ -80,10 +80,12 @@ def main():
 def set_coloured_annots():
     global stroke_colour
     stroke_colour = {
-        0: "blue",
-        1: "red",
+        0: "black",
+        1: "grey",
         2: "white",
-        3: "yellow"
+        3: "yellow",
+        4: "blue",
+        5: "red"
     }
 
 
@@ -153,13 +155,21 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
             last_x = -1.; last_y = -1.
             #if i_unk != 0: # No theory on that one
                 #print('Unexpected value at offset {}'.format(offset - 12))
-            if pen == 0 or pen == 1:
+
+            if pen in (0, 1):
                 pass # Dynamic width, will be truncated into several strokes
-            elif pen == 2 or pen == 4: # Pen / Fineliner
+            elif pen == 2: # Pen
                 width = 32 * width * width - 116 * width + 107
+                if coloured_annotations:
+                    if colour == 0:
+                        colour = 4
+                    if colour == 1:
+                        colour = 0
             elif pen == 3: # Marker
                 width = 64 * width - 112
                 opacity = 0.9
+            elif pen == 4: # Fineliner
+                width = 32 * width * width - 116 * width + 107
             elif pen == 5: # Highlighter
                 width = 30
                 opacity = 0.2
@@ -173,9 +183,59 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
                 opacity = 0.9
             elif pen == 8: # Erase area
                 opacity = 0.
+
+            elif pen == 12: # Paintbrush: normal, thin, thick
+                width = 34.5 * width * width - 116 * width + 107
+                if coloured_annotations:
+                    if colour == 1:
+                        colour = 4
+            elif pen == 13: # Mechanical. Pencil: normal, thin, thick
+                width = 32 * width * width - 116 * width + 107
+                opacity = 0.75
+            elif pen == 14: # Pencil: normal, thin, thick
+                width = 33 * width * width - 116 * width + 107
+                opacity = 0.8
+                if coloured_annotations:
+                    if colour == 1:
+                        colour = 4
+            elif pen == 15: # Ballpoint pen: normal, thick; Fineliner: thin, thick
+                width = 32 * width * width - 116 * width + 107
+                if coloured_annotations:
+                    if colour == 0:
+                        colour = 4
+                    if colour == 1:
+                        colour = 0
+            elif pen == 16: # Marker: normal, thin, thick
+                width = 34 * width * width - 116 * width + 107
+                opacity = 0.7
+                if coloured_annotations:
+                    if colour == 0:
+                        colour = 5
+                    elif colour == 1:
+                        colour = 3
+            elif pen == 17: # Fineliner: normal
+                width = 32 * width * width - 116 * width + 107
+                if coloured_annotations:
+                    if colour == 1:
+                        colour = 4
+                    elif colour == 2:
+                        colour = 5
+            elif pen == 18: # Highliner
+                width = 46 * width * width - 116 * width + 107
+                opacity = 0.25
+                if coloured_annotations:
+                    colour = 3
+            #elif pen == 19: # ???
+            #    width = 32 * width * width - 116 * width + 107
+            #elif pen == 20: # ???
+            #    width = 32 * width * width - 116 * width + 107
+            elif pen == 21: # Calligraphy: normal, thin, thick
+                width = 33 * width * width - 116 * width + 107
+                if coloured_annotations:
+                    colour = 4
             else: 
                 print('Unknown pen: {}'.format(pen))
-                opacity = 0.
+                opacity = 0.2
 
             width /= 2.3 # adjust for transformation to A4
             
