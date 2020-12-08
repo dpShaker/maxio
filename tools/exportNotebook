@@ -360,20 +360,22 @@ done
 for f in "${tmpfolder}"/foreground*.svg; do
     # debug
     #cp -v "$f" ~/debug/"$(basename "$f")" 
-    sw=$(grep -o "stroke-width\:[\.0-9]\+" "$f" | awk -F: '{print $2}')
-    if [ -z ${sw} ]; then
-        continue
-    fi
-    sw=$(echo "$sw * ${STROKE_WIDTH}" | bc)
 
-    op=$(grep -o "opacity\:[\.0-9]\+" "$f" | awk -F: '{print $2}')
-    if [ -z ${op} ]; then
-        continue
-    fi
-    op=$(echo "$op * ${OPACITY}" | bc)
+    while IFS= read -r s
+    do
+        sw=$(echo $s | awk -F: '{print $2}')
+        sw_n=$(echo "$sw * ${STROKE_WIDTH}" | bc)
+        sed -i "s/stroke-width\:${sw}/stroke-width:${sw_n}/" "$f"
+        [ ! $? -eq 0 ] && echo "Failed to set stroke-width in '$f'" && exit 1
+    done < <(grep -o "stroke-width\:[\.0-9]\+" "$f")
 
-    sed -i "s/stroke-width\:[\.0-9]\+/stroke-width:${sw}/g;s/opacity\:[\.0-9]\+/opacity:${op}/g" "$f"
-    [ ! $? -eq 0 ] && echo "Failed to reset stroke-width and opacity in '$f'" && exit 1
+    while IFS= read -r s
+    do
+        op=$(echo $s | awk -F: '{print $2}')
+        op_n=$(echo "$op * ${OPACITY}" | bc)
+        sed -i "s/opacity\:${op}/opacity:${op_n}/" "$f"
+        [ ! $? -eq 0 ] && echo "Failed to set opacity in '$f'" && exit 1
+    done < <(grep -o "opacity\:[\.0-9]\+" "$f")
 done
 # - optimize svg with svgo
 if command -v "svgo" > /dev/null; then
