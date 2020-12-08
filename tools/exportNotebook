@@ -18,6 +18,7 @@ OPACITY="1"
 bad_args=""
 arg_num=0
 KEEP_TEMPDIR=""
+TEMPLATES_DIR=~/ownCloud/reMarkable/Templates
 
 ###
 
@@ -46,6 +47,11 @@ while [[ $# -gt 0 ]]; do
         -r|--remoteip)
             SSH_HOST="$2"
             SSH_TIMEOUT=10
+            shift
+            shift
+            ;;
+        -t|--templates)
+            TEMPLATES_DIR="$2"
             shift
             shift
             ;;
@@ -79,7 +85,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $bad_args == TRUE || $arg_num < 1 ]]; then
-    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w INT] [--opacity|-o FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] <document-name-match|tar.gz-file>"
+    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w INT] [--opacity|-o FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
     exit 1
 fi
 
@@ -165,8 +171,24 @@ if [ -f "$path" ]; then
     [ ! $? -eq 0 ] && echo "File '$path' exists, but it is not a valid .tar.gz" && exit 1
     filename="$(basename $path .tar.gz)"
 
-else
+elif [ -d "$path" ]; then
+    cp -r "$path"* "$tmpfolder"
+    filename="$(basename $path)"
 
+    # Fix for single page notebooks with no template (empty pagedata file by default)
+    if [ ! -s "${tmpfolder}"/*.pagedata ]; then
+        echo "Blank" > "${tmpfolder}"/*.pagedata
+    fi
+
+    # Fix empty lines in pagedata files
+    sed -i -e "s/^[[:blank:]]*$/Blank/" "${tmpfolder}"/*.pagedata
+
+    while IFS= read -r tmpl
+    do
+        ln -s -f "$TEMPLATES_DIR"/"$tmpl".png "$tmpfolder"
+    done < "${tmpfolder}/${filename}.pagedata"
+
+else
     # Establish remote connection
     SSH_REMOTE="root@${SSH_HOST}"
     SSH_CMD="$SSH -S remarkable-ssh"
