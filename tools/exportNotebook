@@ -300,17 +300,23 @@ if [ -f "${tmpfolder}"/*.pdf ]; then
         width=$(echo ${size} | cut -f1 -d " ")
         height=$(echo ${size} | cut -f2 -d " ")
 
-        # Calculate new width and necessary offset (rM dimensions: 1404x1872)
+        # Calculate new width and necessary offset (rM dimensions: 1404x1872px / 1053x1404pt )
         new_width=$(echo "scale=5; ${height} / 1872 * 1404" | bc)
         offset=$(echo "scale=5; ${new_width} - ${width}" | bc)
+        scale=0$(echo "scale=5; ${new_width} / ${width}" | bc)
 
-        echo "Original PDF dimensions are (${width}x${height}), correcting by offset of ${offset} to fit rM foreground."
+        echo "Original PDF dimensions are (${width}x${height}), correcting by offset of ${offset}, scale ${scale} to fit rM foreground."
 
-        # Add offset to background.pdf to match foreground dimensions
-        gs -q -sDEVICE=pdfwrite -dBATCH -dNOPAUSE -sOutputFile=${tmpfolder}/background_with_offset.pdf \
-        -dDEVICEWIDTHPOINTS=${new_width} -dDEVICEHEIGHTPOINTS=${height} -dFIXEDMEDIA \
-        -c "{${offset} 0 translate}" \
-        -f "${tmpfolder}/background_original.pdf"
+        pdfscale_cmd="$(dirname `readlink -f $0`)/pdfScale"
+        if [[ -x ${pdfscale_cmd} ]]; then
+            ${pdfscale_cmd} -s ${scale} --yoffset $(echo "-1 * ${offset}" | bc) -r "custom pt 1053 1404" -v "${tmpfolder}/background_original.pdf" "${tmpfolder}/background_with_offset.pdf"
+        else
+            # Add offset to background.pdf to match foreground dimensions
+            gs -q -sDEVICE=pdfwrite -dBATCH -dNOPAUSE -sOutputFile=${tmpfolder}/background_with_offset.pdf \
+            -dDEVICEWIDTHPOINTS=${new_width} -dDEVICEHEIGHTPOINTS=${height} -dFIXEDMEDIA \
+            -c "{${offset} 0 translate}" \
+            -f "${tmpfolder}/background_original.pdf"
+        fi
 
         ln -s ${tmpfolder}/background_with_offset.pdf ${tmpfolder}/background.pdf
     else
