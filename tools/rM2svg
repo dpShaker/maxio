@@ -149,8 +149,7 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
 
             pen = Pen.factory(pen_nr)(width, colour, coloured_annotations)
 
-            output.write('<!-- pen: {} --> \n<polyline style="fill:none;stroke:{};stroke-width:{};opacity:{}" stroke-linecap="{}" points="'.format(
-                         pen.name, pen.base_color, width, pen.base_opacity, pen.stroke_cap)) # BEGIN stroke
+            pen.svg.start(width)
 
             # Iterate through the segments to form a polyline
             for segment in range(nsegments):
@@ -165,19 +164,15 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
                     xpos = (xpos*x_width)/1404
                     ypos = (1/ratio)*(ypos*y_width)/1872
                 if segment % pen.segment_length == 0:
-                    segment_color = pen.get_segment_color(speed, tilt, width, pressure, last_width)
-                    segment_width = pen.get_segment_width(speed, tilt, width, pressure, last_width)
-                    segment_opacity = pen.get_segment_opacity(speed, tilt, width, pressure, last_width)
-                    #print(segment_color, segment_width, segment_opacity, pen.stroke_cap)
-                    output.write('"/>\n<polyline style="fill:none; stroke:{} ;stroke-width:{:.3f};opacity:{}" stroke-linecap="{}" points="'.format(
-                                 segment_color, segment_width, segment_opacity, pen.stroke_cap)) # UPDATE stroke
+                    segment_width = pen.svg.add_segment(speed, tilt, width, pressure, last_width)
                     if last_x != -1.:
-                        output.write('{:.3f},{:.3f} '.format(last_x, last_y)) # Join to previous segment
-
+                        pen.svg.add_point(last_x, last_y)
                 last_x = xpos; last_y = ypos; last_width = segment_width
-                output.write('{:.3f},{:.3f} '.format(xpos, ypos)) # BEGIN and END polyline segment
+                pen.svg.add_point(xpos, ypos)
 
-            output.write('" />\n') # END stroke
+            pen.svg.finish()
+            output.write(str(pen.svg))
+
 
     # Overlay the page with a clickable rect to flip pages
     output.write('<rect x="0" y="0" width="{}" height="{}" fill-opacity="0"/>'.format(x_width, y_width))
@@ -231,6 +226,36 @@ def extract_data(input_file):
 
 
 class Pen:
+    class SVG_Creator:
+        def __init__(self, pen):
+            self.__pen = pen
+            self.output = ''
+
+        def start(self, width):
+            """  BEGIN stroke """
+            self.output = '<!-- pen: {} --> \n<polyline style="fill:none;stroke:{};stroke-width:{};opacity:{}" stroke-linecap="{}" points="'.format(
+                        self.__pen.name, self.__pen.base_color, width, self.__pen.base_opacity, self.__pen.stroke_cap)
+
+        def add_segment(self, speed, tilt, width, pressure, last_width):
+            """ UPDATE stroke with current segment information """
+            segment_color = self.__pen.get_segment_color(speed, tilt, width, pressure, last_width)
+            segment_width = self.__pen.get_segment_width(speed, tilt, width, pressure, last_width)
+            segment_opacity = self.__pen.get_segment_opacity(speed, tilt, width, pressure, last_width)
+            self.output += '"/>\n<polyline style="fill:none; stroke:{} ;stroke-width:{:.3f};opacity:{}" stroke-linecap="{}" points="'.format(
+                            segment_color, segment_width, segment_opacity, self.__pen.stroke_cap)
+            return segment_width
+
+        def add_point(self, xpos, ypos):
+            """  BEGIN and END polyline segment """
+            self.output += '{:.3f},{:.3f} '.format(xpos, ypos)
+
+        def finish(self):
+            """  END stroke """
+            self.output += '" />\n'
+
+        def __str__(self):
+            return self.output
+
     def __init__(self, base_width, base_color):
         self.base_width = base_width
         self.base_color = stroke_colour[base_color]
@@ -238,6 +263,7 @@ class Pen:
         self.stroke_cap = "round"
         self.base_opacity = 1
         self.name = "Basic Pen"
+        self.svg = Pen.SVG_Creator(self)
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
         return self.base_width
