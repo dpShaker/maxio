@@ -114,9 +114,9 @@ function find_document {
 
         metadata="$(${SSH_CMD} "$SSH_REMOTE" "cat $metadata_path")"
 
-        if ! echo "$metadata" | grep -qF "\"parent\": \"$1\""; then
-            continue
-        fi
+        #if ! echo "$metadata" | grep -qF "\"parent\": \"$1\""; then
+        #    continue
+        #fi
 
         if echo "$metadata" | grep -qF '"deleted": true'; then
             continue
