@@ -24,12 +24,12 @@ default_y_width = 1872
 
 # Mappings
 stroke_colour = {
-    0 : [0, 0, 0],		    # black
-    1 : [125, 125, 125],	# grey
-    2 : [255, 255, 255],	# white
-    3 : [255, 255, 0],	    # yellow
-    4 : [0, 0, 255],		# blue
-    5 : [255, 0, 0]		    # red
+    0 : (0, 0, 0),		    # black
+    1 : (125, 125, 125),	# grey
+    2 : (255, 255, 255),	# white
+    3 : (255, 255, 0),	    # yellow
+    4 : (0, 0, 255),		# blue
+    5 : (255, 0, 0)		    # red
 }
 
 '''stroke_width={
@@ -145,11 +145,9 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
                 #print('Stroke {}: pen_nr={}, colour={}, width={}, unknown={}, nsegments={}'.format(stroke, pen_nr, colour, width, unknown, nsegments))
             
             last_x = -1.; last_y = -1.
-            last_width = 0
 
             pen = Pen.factory(pen_nr)(width, colour, coloured_annotations)
-
-            pen.svg.start(width)
+            svg_segment = pen.svg.segment(width)
 
             # Iterate through the segments to form a polyline
             for segment in range(nsegments):
@@ -164,13 +162,12 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
                     xpos = (xpos*x_width)/1404
                     ypos = (1/ratio)*(ypos*y_width)/1872
                 if segment % pen.segment_length == 0:
-                    segment_width = pen.svg.add_segment(speed, tilt, width, pressure, last_width)
+                    svg_segment = pen.svg.segment(width, speed, tilt, pressure)
                     if last_x != -1.:
-                        pen.svg.add_point(last_x, last_y)
-                last_x = xpos; last_y = ypos; last_width = segment_width
-                pen.svg.add_point(xpos, ypos)
+                        svg_segment.add_point(last_x, last_y)
+                last_x = xpos; last_y = ypos;
+                svg_segment.add_point(xpos, ypos)
 
-            pen.svg.finish()
             output.write(str(pen.svg))
 
 
@@ -226,35 +223,45 @@ def extract_data(input_file):
 
 
 class Pen:
-    class SVG_Creator:
+    class SVGCreator:
+        class Segment:
+            def __init__(self, svg):
+                self.__svg = svg
+                self.output = ""
+
+            @property
+            def _pen(self):
+                return self.__svg._pen
+
+            def _start(self, width, speed, tilt, pressure, last_width):
+                """ Start new polyline segment to draw stroke with current segment information """
+                output, self.__svg._segment_last_width = self._pen._cb_new_segment(width, speed, tilt, pressure, self.__svg._segment_last_width)
+                self.output += output
+                return self
+
+            def add_point(self, xpos, ypos):
+                """  Add point to polyline segment """
+                self.output += '{:.3f},{:.3f} '.format(xpos, ypos)
+
+            def __str__(self):
+                return self.output + '"/>\n'
+
         def __init__(self, pen):
-            self.__pen = pen
+            self._pen = pen
+            self.__segments = []
+            self._segment_last_width = 0
             self.output = ''
 
-        def start(self, width):
-            """  BEGIN stroke """
-            self.output = '<!-- pen: {} --> \n<polyline style="fill:none;stroke:{};stroke-width:{};opacity:{}" stroke-linecap="{}" points="'.format(
-                        self.__pen.name, self.__pen.base_color, width, self.__pen.base_opacity, self.__pen.stroke_cap)
-
-        def add_segment(self, speed, tilt, width, pressure, last_width):
-            """ UPDATE stroke with current segment information """
-            segment_color = self.__pen.get_segment_color(speed, tilt, width, pressure, last_width)
-            segment_width = self.__pen.get_segment_width(speed, tilt, width, pressure, last_width)
-            segment_opacity = self.__pen.get_segment_opacity(speed, tilt, width, pressure, last_width)
-            self.output += '"/>\n<polyline style="fill:none; stroke:{} ;stroke-width:{:.3f};opacity:{}" stroke-linecap="{}" points="'.format(
-                            segment_color, segment_width, segment_opacity, self.__pen.stroke_cap)
-            return segment_width
-
-        def add_point(self, xpos, ypos):
-            """  BEGIN and END polyline segment """
-            self.output += '{:.3f},{:.3f} '.format(xpos, ypos)
-
-        def finish(self):
-            """  END stroke """
-            self.output += '" />\n'
+        def segment(self, width, speed = None, tilt = None, pressure = None, last_width = None):
+            s = Pen.SVGCreator.Segment(self)
+            self.__segments.append(s)
+            return s._start(width, speed, tilt, pressure, last_width)
 
         def __str__(self):
-            return self.output
+            out = '<!-- pen: {} -->\n'.format(self._pen.name)
+            for s in self.__segments:
+                out += str(s)
+            return out
 
     def __init__(self, base_width, base_color):
         self.base_width = base_width
@@ -263,21 +270,39 @@ class Pen:
         self.stroke_cap = "round"
         self.base_opacity = 1
         self.name = "Basic Pen"
-        self.svg = Pen.SVG_Creator(self)
+        self.svg = Pen.SVGCreator(self)
+
+    def _cb_new_segment(self, width, speed, tilt, pressure, last_width):
+        """
+            Callback to format stroke of new segment. Needs to return (format string [unterminated to allow adding points], segment_width).
+            This function can be overloaded by the dedicated Pens if needed.
+        """
+        segment_width = width
+        segment_color = self.base_color
+        segment_opacity = self.base_opacity
+
+        if all([speed, tilt, pressure, last_width]):
+            segment_color = self.get_segment_color(speed, tilt, width, pressure, last_width)
+            segment_width = self.get_segment_width(speed, tilt, width, pressure, last_width)
+            segment_opacity = self.get_segment_opacity(speed, tilt, width, pressure, last_width)
+
+        output = '<polyline style="fill:none;stroke:rgb{};stroke-width:{:.3f};opacity:{}" stroke-linecap="{}" points="'.format(
+                         segment_color, segment_width, segment_opacity, self.stroke_cap)
+        return output, segment_width
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
         return self.base_width
 
     def get_segment_color(self, speed, tilt, width, pressure, last_width):
-        return "rgb"+str(tuple(self.base_color))
+        return tuple(self.base_color)
 
     def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
         return self.base_opacity
 
     def cutoff(self, value):
         """must be between 1 and 0"""
-        value = 1 if value > 1 else value
-        value = 0 if value < 0 else value
+        value = min(value, 1)
+        value = max(0, value)
         return value
 
     @staticmethod
@@ -328,7 +353,7 @@ class Ballpoint(Pen):
         segment_color = [max(0, int(self.base_color[0] - rev_intensity * 255)),
                          max(0, int(self.base_color[1] - rev_intensity * 255)),
                          max(0, int(self.base_color[2] - rev_intensity * 255))]
-        return "rgb"+str(tuple(segment_color))
+        return tuple(segment_color)
 
     # def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
     #     segment_opacity = (0.2 * -(speed / 35)) + (0.8 * pressure)
@@ -410,8 +435,7 @@ class Brush(Pen):
         segment_color = [int(rev_intensity * (255-self.base_color[0])),
                          int(rev_intensity * (255-self.base_color[1])),
                          int(rev_intensity * (255-self.base_color[2]))]
-
-        return "rgb"+str(tuple(segment_color))
+        return tuple(segment_color)
 
 
 class Highlighter(Pen):
