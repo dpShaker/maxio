@@ -357,26 +357,40 @@ EOF
 done
 
 # Preprocess foreground*.svg
+spin_c="/-\|"
 for f in "${tmpfolder}"/foreground*.svg; do
     # debug
     #cp -v "$f" ~/debug/"$(basename "$f")" 
+    r=$(echo "${STROKE_WIDTH} == 1.0" | bc)
+    if [ $r -eq 0 ]; then
+        printf "Warning: Stroke width adaption can take some time. Please be patient: "
+        echo -n ' '
+        while IFS= read -r s
+        do
+            printf "\b${spin_c:i++%${#spin_c}:1}"
+            sw=$(echo $s | awk -F: '{print $2}')
+            sw_n=$(echo "$sw * ${STROKE_WIDTH}" | bc)
+            sed -i "s/stroke-width\:${sw}/stroke-width:${sw_n}/" "$f"
+            [ ! $? -eq 0 ] && echo "Failed to set stroke-width in '$f'" && exit 1
+        done < <(grep -o "stroke-width\:[\.0-9]\+" "$f")
+        # TODO: the grep should only return one match for each found width value
+    fi
 
-    while IFS= read -r s
-    do
-        sw=$(echo $s | awk -F: '{print $2}')
-        sw_n=$(echo "$sw * ${STROKE_WIDTH}" | bc)
-        sed -i "s/stroke-width\:${sw}/stroke-width:${sw_n}/" "$f"
-        [ ! $? -eq 0 ] && echo "Failed to set stroke-width in '$f'" && exit 1
-    done < <(grep -o "stroke-width\:[\.0-9]\+" "$f")
-
-    while IFS= read -r s
-    do
-        op=$(echo $s | awk -F: '{print $2}')
-        op_n=$(echo "$op * ${OPACITY}" | bc)
-        sed -i "s/opacity\:${op}/opacity:${op_n}/" "$f"
-        [ ! $? -eq 0 ] && echo "Failed to set opacity in '$f'" && exit 1
-    done < <(grep -o "opacity\:[\.0-9]\+" "$f")
+    r=$(echo "${OPACITY} == 1.0" | bc)
+    if [ $r -eq 0 ]; then
+        printf "Warning: Opacity adaption can take some time. Please be patient: "
+        echo -n ' '
+        while IFS= read -r s
+        do
+            printf "\b${spin_c:i++%${#spin_c}:1}"
+            op=$(echo $s | awk -F: '{print $2}')
+            op_n=$(echo "$op * ${OPACITY}" | bc)
+            sed -i "s/opacity\:${op}/opacity:${op_n}/" "$f"
+            [ ! $? -eq 0 ] && echo "Failed to set opacity in '$f'" && exit 1
+        done < <(grep -o "opacity\:[\.0-9]\+" "$f")
+    fi
 done
+
 # - optimize svg with svgo
 if command -v "svgo" > /dev/null; then
     for f in "${tmpfolder}"/foreground*.svg; do
