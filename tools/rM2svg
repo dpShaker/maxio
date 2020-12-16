@@ -12,11 +12,12 @@ import struct
 import os.path
 import argparse
 import re
-
+import logging
 
 __prog_name__ = "rm2svg"
 __version__ = "0.0.2.3"
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
 
 # Size
 default_x_width = 1404
@@ -95,6 +96,9 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
            x_width=default_x_width, y_width=default_y_width):
     # Read the file in memory. Consider optimising by reading chunks.
 
+    logger = logging.getLogger("rm2svg")
+    logger.setLevel(logging.INFO)
+
     with open(input_file, 'rb') as f:
         data = f.read()
     offset = 0
@@ -135,20 +139,20 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
 
     # Iterate through layers on the page (There is at least one)
     for layer in range(nlayers):
-        # print('New layer')
         fmt = '<I'
         (nstrokes,) = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
 
-        # print('nstrokes={}'.format(nstrokes))
+        logger.debug('New layer: nstrokes={}'.format(nstrokes))
         # Iterate through the strokes in the layer (If there is any)
         for stroke in range(nstrokes):
             if is_v3:
                 fmt = '<IIIfI'
                 pen_nr, colour, i_unk, width, nsegments = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
+                logger.debug('V3: Stroke {}: pen_nr={}, colour={}, width={}, nsegments={}'.format(stroke, pen_nr, colour, width, nsegments))
             if is_v5:
                 fmt = '<IIIffI'
                 pen_nr, colour, i_unk, width, unknown, nsegments = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
-                #print('Stroke {}: pen_nr={}, colour={}, width={}, unknown={}, nsegments={}'.format(stroke, pen_nr, colour, width, unknown, nsegments))
+                logger.debug('V5: Stroke {}: pen_nr={}, colour={}, width={}, unknown={}, nsegments={}'.format(stroke, pen_nr, colour, width, unknown, nsegments))
             
             last_x = -1.; last_y = -1.
 
@@ -269,13 +273,15 @@ class Pen:
                 out += str(s)
             return out
 
+    name = "Basic Pen"
     def __init__(self, base_width, base_color):
+        self.logger = logging.getLogger(self.name)
+        self.logger.setLevel(logging.INFO)
         self.base_width = base_width
         self.base_color = stroke_colour[base_color]
         self.segment_length = 1000
         self.stroke_cap = "round"
         self.base_opacity = 1
-        self.name = "Basic Pen"
         self.svg = Pen.SVGCreator(self)
 
     def _cb_new_segment(self, width, speed, tilt, pressure, last_width):
@@ -322,6 +328,7 @@ class Pen:
 
 class Fineliner(Pen):
     ids = (4, 17)
+    name = "Fineliner"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         if coloured_annotations:
             if base_color == 1:
@@ -330,11 +337,11 @@ class Fineliner(Pen):
                 base_color = 5
         super().__init__(base_width, base_color)
         self.base_width = (base_width ** 2.1) * 1.3
-        self.name = "Fineliner"
 
 
 class Ballpoint(Pen):
     ids = (2, 15)
+    name = "Ballpoint"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         if coloured_annotations:
             if base_color == 0:
@@ -343,10 +350,10 @@ class Ballpoint(Pen):
                 base_color = 0
         super().__init__(base_width, base_color)
         self.segment_length = 5
-        self.name = "Ballpoint"
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
-        segment_width = (0.5 + pressure) + (1 * width) - 0.5*(speed/50)
+        segment_width = (0.3 + pressure) + (0.8 * width) - 0.5*(speed/50)
+        self.logger.debug(f"segment_width: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Segment Width: {segment_width}")
         return segment_width
 
     def get_segment_color(self, speed, tilt, width, pressure, last_width):
@@ -359,6 +366,7 @@ class Ballpoint(Pen):
         segment_color = [max(0, int(self.base_color[0] + rev_intensity * (255-self.base_color[0]))),
                          max(0, int(self.base_color[1] + rev_intensity * (255-self.base_color[1]))),
                          max(0, int(self.base_color[2] + rev_intensity * (255-self.base_color[2])))]
+        self.logger.debug(f"segment_color: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Intensity: {intensity} => Color: {segment_color}")
         return tuple(segment_color)
 
     # def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
@@ -369,6 +377,7 @@ class Ballpoint(Pen):
 
 class Marker(Pen):
     ids = (3, 16)
+    name = "Marker"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         if coloured_annotations:
             if base_color == 0:
@@ -378,15 +387,16 @@ class Marker(Pen):
         super().__init__(base_width, base_color)
         self.base_opacity = 0.8
         self.segment_length = 3
-        self.name = "Marker"
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
         segment_width = 0.9 * (((1 * width)) - 0.4 * tilt) + (0.1 * last_width)
+        self.logger.debug(f"segment_width: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Segment Width: {segment_width}")
         return segment_width
 
 
 class Pencil(Pen):
     ids = (1, 14)
+    name = "Pencil"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         if coloured_annotations:
             if base_color == 1:
@@ -395,31 +405,32 @@ class Pencil(Pen):
         self.base_width = self.base_width * 2
         self.base_opacity = 0.8
         self.segment_length = 2
-        self.name = "Pencil"
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
         segment_width = 0.7 * ((((0.8*self.base_width) + (0.5 * pressure)) * (1 * width)) - (0.25 * tilt**1.8) - (0.6 * speed / 50))
        #segment_width = 1.3*(((self.base_width * 0.4) * pressure) - 0.5 * ((tilt ** 0.5)) + (0.5 * last_width))
         max_width = self.base_width
-        segment_width = min(segment_width, max_width)
-        return segment_width
+        self.logger.debug(f"segment_width: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Segment Width: min({segment_width},{max_width})")
+        return min(segment_width, max_width)
 
     def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
         segment_opacity = (0.1 * -(speed / 35)) + (1 * pressure)
+        self.logger.debug(f"segment_opacity: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Opacity: min({self.cutoff(segment_opacity) - 0.1},{self.base_opacity})")
         return min(self.cutoff(segment_opacity) - 0.1, self.base_opacity)
 
 
 class Mechanical_Pencil(Pen):
     ids = (7, 13)
+    name = "Mechanical Pencil"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         super().__init__(base_width, base_color)
         self.base_width = self.base_width ** 2
         self.base_opacity = 0.7
-        self.name = "Mechanical Pencil"
 
 
 class Brush(Pen):
     ids = (0, 12)
+    name = "Brush"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         if coloured_annotations:
             if base_color == 0:
@@ -432,11 +443,11 @@ class Brush(Pen):
         self.segment_length = 2
         self.stroke_cap = "round"
         self.opacity = 1
-        self.name = "Brush"
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
         segment_width = 0.7 * (((1 + (1.4 * pressure)) * (1 * width)) - (0.5 * tilt) - (0.5 * speed / 50))  #+ (0.2 * last_width)
         max_width = self.base_width * 7
+        self.logger.debug(f"segment_width: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Segment Width: min({segment_width}, {max_width})")
         return min(segment_width, max_width)
 
     def get_segment_color(self, speed, tilt, width, pressure, last_width):
@@ -449,59 +460,62 @@ class Brush(Pen):
         segment_color = [max(0, int(self.base_color[0] + rev_intensity * (255-self.base_color[0]))),
                          max(0, int(self.base_color[1] + rev_intensity * (255-self.base_color[1]))),
                          max(0, int(self.base_color[2] + rev_intensity * (255-self.base_color[2])))]
+        self.logger.debug(f"segment_color: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Intensity: {intensity} => Color: {segment_color}")
         return tuple(segment_color)
 
 
 class Highlighter(Pen):
     ids = (5, 18)
+    name = "Highlighter"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         super().__init__(base_width, 3 if coloured_annotations else base_color)
         self.base_width = 20
         self.stroke_cap = "butt"
         self.base_opacity = 0.3
-        self.name = "Highlighter"
+        self.sharpen_threshold = 5
 
 
 class Eraser(Pen):
     ids = (6,)
+    name = "Eraser"
     def __init__(self, base_width, base_color = 2, coloured_annotations = False):
         if base_color == 0:
             base_color = 2
         super().__init__(base_width, base_color)
         self.stroke_cap = "round"
         self.base_width = self.base_width * 2
-        self.name = "Eraser"
 
 class Erase_Area(Pen):
     ids = (8,)
+    name = "Erase Area"
     def __init__(self, base_width, base_color = 2, coloured_annotations = False):
         if base_color == 0:
             base_color = 2
         super().__init__(base_width, base_color)
         self.stroke_cap = "square"
         self.base_opacity = 0
-        self.name = "Erase Area"
 
 
 class Calligraphy(Pen):
     ids = (21, )
+    name = "Calligraphy"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         super().__init__(base_width, 4 if coloured_annotations else base_color)
         self.segment_length = 2
-        self.name = "Calligraphy"
 
     def get_segment_width(self, speed, tilt, width, pressure, last_width):
-        segment_width = 0.9 * (((1 + pressure) * (1 * width)) - 0.45 * tilt) + (0.1 * last_width)
+        segment_width = 0.5 * (((1 + pressure) * (0.9 * width)) - 0.45 * tilt) + (0.15 * last_width)
         max_width = self.base_width * 5
+        self.logger.debug(f"segment_width: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Segment Width: min({segment_width}, {max_width})")
         return min(segment_width, max_width)
 
 class Unknown(Pen):
     ids = (-1,)
+    name = "Unknown"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         super().__init__(base_width, 4 if coloured_annotations else base_color)
         self.stroke_cap = "square"
         self.base_opacity = 0.3
-        self.name = "Unknown"
 
 if __name__ == "__main__":
     main()
