@@ -15,7 +15,7 @@ import re
 import logging
 
 __prog_name__ = "rm2svg"
-__version__ = "0.0.2.3"
+__version__ = "0.0.2.4"
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s:%(levelname)s:%(name)s:%(message)s')
 
@@ -238,6 +238,7 @@ class Pen:
             def __init__(self, svg):
                 self.__svg = svg
                 self.output = ""
+                self.last_x = self.last_y = None
 
             @property
             def _pen(self):
@@ -250,8 +251,22 @@ class Pen:
                 return self
 
             def add_point(self, xpos, ypos):
+                threshold = self._pen.sharpen_threshold
+                if None not in (self.last_x, self.last_y):
+                    diff_x = abs(self.last_x - xpos)
+                    diff_y = abs(self.last_y - ypos)
+                    s = ""
+                    try:
+                        if diff_x**2 + diff_y**2 < threshold:
+                            s = " -> skipped"
+                            return
+                    finally:
+                        self._pen.logger.debug(f"SVG:add_point/sharpen {xpos:19.14f},{ypos:19.14f} (Offset: {diff_x:17.14f},{diff_y:17.14f}) -> {diff_x**2 + diff_y**2} < {threshold}{s}")
+
                 """  Add point to polyline segment """
                 self.output += '{:.3f},{:.3f} '.format(xpos, ypos)
+                self.last_x = xpos
+                self.last_y = ypos
 
             def __str__(self):
                 return self.output + '"/>\n'
@@ -283,6 +298,7 @@ class Pen:
         self.stroke_cap = "round"
         self.base_opacity = 1
         self.svg = Pen.SVGCreator(self)
+        self.sharpen_threshold = self.base_width / 5
 
     def _cb_new_segment(self, width, speed, tilt, pressure, last_width):
         """
