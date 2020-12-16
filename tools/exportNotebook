@@ -372,8 +372,8 @@ for f in "${tmpfolder}"/foreground*.svg; do
             sw_n=$(echo "$sw * ${STROKE_WIDTH}" | bc)
             sed -i "s/stroke-width\:${sw}/stroke-width:${sw_n}/" "$f"
             [ ! $? -eq 0 ] && echo "Failed to set stroke-width in '$f'" && exit 1
-        done < <(grep -o "stroke-width\:[\.0-9]\+" "$f")
-        # TODO: the grep should only return one match for each found width value
+        done < <(grep -o "stroke-width\:[\.0-9]\+" "$f" | sort | uniq)
+        echo ""
     fi
 
     r=$(echo "${OPACITY} == 1.0" | bc)
@@ -387,7 +387,8 @@ for f in "${tmpfolder}"/foreground*.svg; do
             op_n=$(echo "$op * ${OPACITY}" | bc)
             sed -i "s/opacity\:${op}/opacity:${op_n}/" "$f"
             [ ! $? -eq 0 ] && echo "Failed to set opacity in '$f'" && exit 1
-        done < <(grep -o "opacity\:[\.0-9]\+" "$f")
+        done < <(grep -o "opacity\:[\.0-9]\+" "$f" | sort | uniq)
+        echo ""
     fi
 done
 
