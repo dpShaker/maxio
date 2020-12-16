@@ -12,6 +12,7 @@ import struct
 import os.path
 import argparse
 import re
+import json
 import logging
 
 __prog_name__ = "rm2svg"
@@ -121,6 +122,12 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
         abort('Not a valid reMarkable file: <header={}><nlayers={}>'.format(header, nlayers))
         return
 
+    try:
+        with open(input_file[:-3] + "-metadata.json") as f:
+            metadata = json.load(f)
+    except:
+        metadata = None
+
     output = open(output_name, 'w')
     output.write('<svg xmlns="http://www.w3.org/2000/svg" height="{}" width="{}">'.format(y_width, x_width)) # BEGIN Notebook
     output.write('''
@@ -138,11 +145,15 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
     output.write('<g id="p1" style="display:inline"><filter id="blurMe"><feGaussianBlur in="SourceGraphic" stdDeviation="10" /></filter>')
 
     # Iterate through layers on the page (There is at least one)
+    layer_cnt = 0
     for layer in range(nlayers):
         fmt = '<I'
         (nstrokes,) = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
 
-        logger.debug('New layer: nstrokes={}'.format(nstrokes))
+        layer_name = metadata['layers'][layer_cnt]['name'] if metadata is not None else f"Layer_{layer_cnt}"
+        logger.debug(f"New layer: name={layer_name}, nstrokes={nstrokes}")
+
+
         # Iterate through the strokes in the layer (If there is any)
         for stroke in range(nstrokes):
             if is_v3:
@@ -175,11 +186,12 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
                     svg_segment = pen.svg.segment(width, speed, tilt, pressure)
                     if last_x != -1.:
                         svg_segment.add_point(last_x, last_y)
-                last_x = xpos; last_y = ypos;
+                last_x = xpos; last_y = ypos
                 svg_segment.add_point(xpos, ypos)
 
             output.write(str(pen.svg))
 
+        layer_cnt += 1
 
     # Overlay the page with a clickable rect to flip pages
     output.write('<rect x="0" y="0" width="{}" height="{}" fill-opacity="0"/>'.format(x_width, y_width))
