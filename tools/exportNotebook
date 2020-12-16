@@ -15,6 +15,7 @@ SSH_TIMEOUT=1
 path=""
 STROKE_WIDTH="1"
 OPACITY="1"
+OFFSET_FACTOR=-1
 bad_args=""
 arg_num=0
 KEEP_TEMPDIR=""
@@ -65,6 +66,11 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -f|--offsef)
+            OFFSET_FACTOR="$2"
+            shift
+            shift
+            ;;
         -*)
             echo "Unknown option: $1"
             bad_args=TRUE
@@ -85,7 +91,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $bad_args == TRUE || $arg_num < 1 ]]; then
-    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
+    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--offset|-f FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
     exit 1
 fi
 
@@ -309,7 +315,7 @@ if [ -f "${tmpfolder}"/*.pdf ]; then
 
         pdfscale_cmd="$(dirname `readlink -f $0`)/pdfScale"
         if [[ -x ${pdfscale_cmd} ]]; then
-            ${pdfscale_cmd} -s ${scale} --yoffset $(echo "-1 * ${offset}" | bc) -r "custom pt 1053 1404" -v "${tmpfolder}/background_original.pdf" "${tmpfolder}/background_with_offset.pdf"
+            ${pdfscale_cmd} -s ${scale} --yoffset $(echo "${OFFSET_FACTOR} * ${offset}" | bc) -r "custom pt 1053 1404" -v "${tmpfolder}/background_original.pdf" "${tmpfolder}/background_with_offset.pdf"
         else
             # Add offset to background.pdf to match foreground dimensions
             gs -q -sDEVICE=pdfwrite -dBATCH -dNOPAUSE -sOutputFile=${tmpfolder}/background_with_offset.pdf \
