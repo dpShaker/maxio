@@ -16,6 +16,7 @@ path=""
 STROKE_WIDTH="1"
 OPACITY="1"
 OFFSET_FACTOR=-1
+SKIP_LAYERS=""
 bad_args=""
 arg_num=0
 KEEP_TEMPDIR=""
@@ -66,8 +67,13 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
-        -f|--offsef)
+        -f|--offset)
             OFFSET_FACTOR="$2"
+            shift
+            shift
+            ;;
+        -s|--skip_layers)
+            SKIP_LAYERS="-s $2"
             shift
             shift
             ;;
@@ -91,7 +97,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $bad_args == TRUE || $arg_num < 1 ]]; then
-    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--offset|-f FLOAT] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
+    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--offset|-f FLOAT] [--skip_layers|-s value[,value]] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
     exit 1
 fi
 
@@ -162,9 +168,10 @@ if [[ $? -ne 0 ]]; then
         exit 1
     fi
 else
-    rM2svg_cmd="rM2svg"
+    rM2svg_cmd="rM2svg ${SKIP_LAYERS}"
 fi
 
+rM2svg_cmd="${rM2svg_cmd} ${SKIP_LAYERS}"
 [ -n "$COLOR_ANNOTATIONS" ] && rM2svg_cmd="$rM2svg_cmd -c"
 
 tmpfolder=$(mktemp -d)

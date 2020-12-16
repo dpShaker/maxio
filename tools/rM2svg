@@ -48,6 +48,10 @@ stroke_colour = {
 
 
 def main():
+    class SkipList(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            setattr(namespace, self.dest, [ v for v in values.split(',') if v ])
+
     parser = argparse.ArgumentParser(prog=__prog_name__)
     parser.add_argument('--height',
                         help='Desired height of image',
@@ -76,6 +80,11 @@ def main():
                         help="Colour annotations for document markup.",
                         action='store_true',
                         )
+    parser.add_argument("-s",
+                        "--skip_layers",
+                        help="List of layers to be skipped.",
+                        action=SkipList
+                        )
     parser.add_argument('--version',
                         action='version',
                         version='%(prog)s {version}'.format(version=__version__))
@@ -83,7 +92,7 @@ def main():
 
     if not os.path.exists(args.input):
         parser.error('The file "{}" does not exist!'.format(args.input))
-    rm2svg(args.input, args.output, args.coloured_annotations,
+    rm2svg(args.input, args.output, args.coloured_annotations, args.skip_layers if args.skip_layers is not None else [],
            args.width, args.height)
 
 
@@ -93,7 +102,7 @@ def abort(msg):
     sys.exit(1)
 
 
-def rm2svg(input_file, output_name, coloured_annotations=False,
+def rm2svg(input_file, output_name, coloured_annotations=False, skip_list=[],
            x_width=default_x_width, y_width=default_y_width):
     # Read the file in memory. Consider optimising by reading chunks.
 
@@ -142,7 +151,7 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
     ''')
 
     # Iterate through pages (There is at least one)
-    output.write('<g id="p1" style="display:inline"><filter id="blurMe"><feGaussianBlur in="SourceGraphic" stdDeviation="10" /></filter>')
+    output.write('<g id="p1" style="display:inline"><filter id="blurMe"><feGaussianBlur in="SourceGraphic" stdDeviation="10" /></filter>\n')
 
     # Iterate through layers on the page (There is at least one)
     layer_cnt = 0
@@ -153,6 +162,7 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
         layer_name = metadata['layers'][layer_cnt]['name'] if metadata is not None else f"Layer_{layer_cnt}"
         logger.debug(f"New layer: name={layer_name}, nstrokes={nstrokes}")
 
+        output.write(f"<g id=\"{layer_name}\">\n")
 
         # Iterate through the strokes in the layer (If there is any)
         for stroke in range(nstrokes):
@@ -189,8 +199,13 @@ def rm2svg(input_file, output_name, coloured_annotations=False,
                 last_x = xpos; last_y = ypos
                 svg_segment.add_point(xpos, ypos)
 
-            output.write(str(pen.svg))
+            if layer_name not in skip_list:
+                output.write(str(pen.svg))
 
+        if layer_name in skip_list:
+            output.write("<!-- SKIPPED -->\n")
+
+        output.write('</g>\n')
         layer_cnt += 1
 
     # Overlay the page with a clickable rect to flip pages
