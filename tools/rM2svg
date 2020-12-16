@@ -22,6 +22,7 @@ __version__ = "0.0.2.3"
 default_x_width = 1404
 default_y_width = 1872
 
+# TODO: think about using a dedicated module for color management
 # Mappings
 stroke_colour = {
     0 : (0, 0, 0),		    # black
@@ -29,7 +30,12 @@ stroke_colour = {
     2 : (255, 255, 255),	# white
     3 : (255, 255, 0),	    # yellow
     4 : (0, 0, 255),		# blue
-    5 : (255, 0, 0)		    # red
+    5 : (255, 0, 0),	    # red
+    6 : (0, 255, 0),		# green
+    7 : (255, 165, 0),	    # orange
+    8 : (0, 0, 100),		# darkblue
+    9 : (100, 0, 0),	    # darkred
+    10 : (0, 100, 0)		# darkgreen
 }
 
 '''stroke_width={
@@ -350,9 +356,9 @@ class Ballpoint(Pen):
         # Color must be 255 rgb
         rev_intensity = abs(intensity - 1)
         # TODO: this needs some testing and maybe fixes
-        segment_color = [max(0, int(self.base_color[0] - rev_intensity * 255)),
-                         max(0, int(self.base_color[1] - rev_intensity * 255)),
-                         max(0, int(self.base_color[2] - rev_intensity * 255))]
+        segment_color = [max(0, int(self.base_color[0] + rev_intensity * (255-self.base_color[0]))),
+                         max(0, int(self.base_color[1] + rev_intensity * (255-self.base_color[1]))),
+                         max(0, int(self.base_color[2] + rev_intensity * (255-self.base_color[2])))]
         return tuple(segment_color)
 
     # def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
@@ -415,6 +421,13 @@ class Mechanical_Pencil(Pen):
 class Brush(Pen):
     ids = (0, 12)
     def __init__(self, base_width, base_color, coloured_annotations = False):
+        if coloured_annotations:
+            if base_color == 0:
+                base_color = 10
+            elif base_color == 1:
+                base_color = 9
+            elif base_color == 2:
+                base_color = 8
         super().__init__(base_width, base_color)
         self.segment_length = 2
         self.stroke_cap = "round"
@@ -432,9 +445,10 @@ class Brush(Pen):
         # using segment color not opacity because the dots interfere with each other.
         # Color must be 255 rgb
         rev_intensity = abs(intensity - 1)
-        segment_color = [int(rev_intensity * (255-self.base_color[0])),
-                         int(rev_intensity * (255-self.base_color[1])),
-                         int(rev_intensity * (255-self.base_color[2]))]
+        # TODO: this needs some testing and maybe fixes
+        segment_color = [max(0, int(self.base_color[0] + rev_intensity * (255-self.base_color[0]))),
+                         max(0, int(self.base_color[1] + rev_intensity * (255-self.base_color[1]))),
+                         max(0, int(self.base_color[2] + rev_intensity * (255-self.base_color[2])))]
         return tuple(segment_color)
 
 
