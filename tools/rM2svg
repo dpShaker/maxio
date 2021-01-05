@@ -15,6 +15,8 @@ import re
 import json
 import logging
 
+import colour
+
 __prog_name__ = "rm2svg"
 __version__ = "0.0.2.4"
 
@@ -27,17 +29,17 @@ default_y_width = 1872
 # TODO: think about using a dedicated module for color management
 # Mappings
 stroke_colour = {
-    0 : (0, 0, 0),		    # black
-    1 : (125, 125, 125),	# grey
-    2 : (255, 255, 255),	# white
-    3 : (255, 255, 0),	    # yellow
-    4 : (0, 0, 255),		# blue
-    5 : (255, 0, 0),	    # red
-    6 : (0, 255, 0),		# green
-    7 : (255, 165, 0),	    # orange
-    8 : (0, 0, 100),		# darkblue
-    9 : (100, 0, 0),	    # darkred
-    10 : (0, 100, 0)		# darkgreen
+    0 : colour.Color(rgb=(0   , 0   , 0)),		# black
+    1 : colour.Color(rgb=(0.5 , 0.5 , 0.5)),	# grey
+    2 : colour.Color(rgb=(1   , 1   , 1)),	    # white
+    3 : colour.Color(rgb=(1   , 1   , 0)),	    # yellow
+    4 : colour.Color(rgb=(0   , 0   , 1)),		# blue
+    5 : colour.Color(rgb=(1   , 0   , 0)),	    # red
+    6 : colour.Color(rgb=(0   , 1   , 0)),		# green
+    7 : colour.Color(rgb=(1   , 0.65, 0)),	    # orange
+    8 : colour.Color(rgb=(0   , 0   , 0.39)),	# darkblue
+    9 : colour.Color(rgb=(0.39, 0   , 0)),	    # darkred
+    10 : colour.Color(rgb=(0  , 0.39, 0))		# darkgreen
 }
 
 '''stroke_width={
@@ -168,16 +170,16 @@ def rm2svg(input_file, output_name, coloured_annotations=False, skip_list=[],
         for stroke in range(nstrokes):
             if is_v3:
                 fmt = '<IIIfI'
-                pen_nr, colour, i_unk, width, nsegments = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
-                logger.debug('V3: Stroke {}: pen_nr={}, colour={}, width={}, nsegments={}'.format(stroke, pen_nr, colour, width, nsegments))
+                pen_nr, color, i_unk, width, nsegments = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
+                logger.debug('V3: Stroke {}: pen_nr={}, colour={}, width={}, nsegments={}'.format(stroke, pen_nr, color, width, nsegments))
             if is_v5:
                 fmt = '<IIIffI'
-                pen_nr, colour, i_unk, width, unknown, nsegments = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
-                logger.debug('V5: Stroke {}: pen_nr={}, colour={}, width={}, unknown={}, nsegments={}'.format(stroke, pen_nr, colour, width, unknown, nsegments))
+                pen_nr, color, i_unk, width, unknown, nsegments = struct.unpack_from(fmt, data, offset); offset += struct.calcsize(fmt)
+                logger.debug('V5: Stroke {}: pen_nr={}, colour={}, width={}, unknown={}, nsegments={}'.format(stroke, pen_nr, color, width, unknown, nsegments))
             
             last_x = -1.; last_y = -1.
 
-            pen = Pen.factory(pen_nr)(width, colour, coloured_annotations)
+            pen = Pen.factory(pen_nr)(width, color, coloured_annotations)
             svg_segment = pen.svg.segment(width)
 
             # Iterate through the segments to form a polyline
@@ -349,7 +351,7 @@ class Pen:
         return self.base_width
 
     def get_segment_color(self, speed, tilt, width, pressure, last_width):
-        return tuple(self.base_color)
+        return tuple(map(lambda x: x*255, self.base_color.rgb))
 
     def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
         return self.base_opacity
@@ -408,9 +410,9 @@ class Ballpoint(Pen):
         # Color must be 255 rgb
         rev_intensity = abs(intensity - 1)
         # TODO: this needs some testing and maybe fixes
-        segment_color = [max(0, int(self.base_color[0] + rev_intensity * (255-self.base_color[0]))),
-                         max(0, int(self.base_color[1] + rev_intensity * (255-self.base_color[1]))),
-                         max(0, int(self.base_color[2] + rev_intensity * (255-self.base_color[2])))]
+        segment_color = [int(255 * max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0]))),
+                         int(255 * max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1]))),
+                         int(255 * max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2])))]
         self.logger.debug(f"segment_color: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Intensity: {intensity} => Color: {segment_color}")
         return tuple(segment_color)
 
@@ -504,9 +506,9 @@ class Brush(Pen):
         # Color must be 255 rgb
         rev_intensity = abs(intensity - 1)
         # TODO: this needs some testing and maybe fixes
-        segment_color = [max(0, int(self.base_color[0] + rev_intensity * (255-self.base_color[0]))),
-                         max(0, int(self.base_color[1] + rev_intensity * (255-self.base_color[1]))),
-                         max(0, int(self.base_color[2] + rev_intensity * (255-self.base_color[2])))]
+        segment_color = [int(255 * max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0]))),
+                         int(255 * max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1]))),
+                         int(255 * max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2])))]
         self.logger.debug(f"segment_color: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Intensity: {intensity} => Color: {segment_color}")
         return tuple(segment_color)
 
