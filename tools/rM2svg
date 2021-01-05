@@ -180,6 +180,11 @@ def rm2svg(input_file, output_name, coloured_annotations=False, skip_list=[],
             last_x = -1.; last_y = -1.
 
             pen = Pen.factory(pen_nr)(width, color, coloured_annotations)
+            try:
+                pen.base_color = colour.Color(layer_name)
+                pen.base_color.saturation = 1 - (color * 0.33)
+            except ValueError as e:
+                pass
             svg_segment = pen.svg.segment(width)
 
             # Iterate through the segments to form a polyline
