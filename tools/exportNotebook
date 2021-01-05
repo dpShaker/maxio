@@ -186,7 +186,7 @@ if [ -f "$path" ]; then
 
 elif [ -d "$path" ]; then
     cp -r "$path"* "$tmpfolder"
-    filename="$(basename $path)"
+    filename=$(basename "$path")
 
     # Fix for single page notebooks with no template (empty pagedata file by default)
     if [ ! -s "${tmpfolder}"/*.pagedata ]; then
