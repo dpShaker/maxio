@@ -340,13 +340,15 @@ class Pen:
             This function can be overloaded by the dedicated Pens if needed.
         """
         segment_width = width
-        segment_color = self.base_color
+        segment_color = self.base_color.rgb
         segment_opacity = self.base_opacity
 
         if all([speed, tilt, pressure, last_width]):
             segment_color = self.get_segment_color(speed, tilt, width, pressure, last_width)
             segment_width = self.get_segment_width(speed, tilt, width, pressure, last_width)
             segment_opacity = self.get_segment_opacity(speed, tilt, width, pressure, last_width)
+
+        segment_color = tuple(map(lambda x: x*255, segment_color))
 
         output = '<polyline style="fill:none;stroke:rgb{};stroke-width:{:.3f};opacity:{}" stroke-linecap="{}" points="'.format(
                          segment_color, segment_width, segment_opacity, self.stroke_cap)
@@ -415,9 +417,9 @@ class Ballpoint(Pen):
         # Color must be 255 rgb
         rev_intensity = abs(intensity - 1)
         # TODO: this needs some testing and maybe fixes
-        segment_color = [int(255 * max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0]))),
-                         int(255 * max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1]))),
-                         int(255 * max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2])))]
+        segment_color = [max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0])),
+                         max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1])),
+                         max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2]))]
         self.logger.debug(f"segment_color: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Intensity: {intensity} => Color: {segment_color}")
         return tuple(segment_color)
 
@@ -511,9 +513,9 @@ class Brush(Pen):
         # Color must be 255 rgb
         rev_intensity = abs(intensity - 1)
         # TODO: this needs some testing and maybe fixes
-        segment_color = [int(255 * max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0]))),
-                         int(255 * max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1]))),
-                         int(255 * max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2])))]
+        segment_color = [max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0])),
+                         max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1])),
+                         max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2]))]
         self.logger.debug(f"segment_color: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Intensity: {intensity} => Color: {segment_color}")
         return tuple(segment_color)
 
