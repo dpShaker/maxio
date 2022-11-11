@@ -179,10 +179,23 @@ echo "Using temp folder '$tmpfolder'"
 
 OUTPUT_UUID=""
 
+
+function link_templates {
+    tmpfolder="$1"
+    file="$2"
+    while IFS= read -r tmpl
+    do
+        ln -s -f "$TEMPLATES_DIR"/"$tmpl".png "$tmpfolder"
+    done < "$file"
+}
+
 if [ -f "$path" ]; then
     tar -xvzf "$path" -C "$tmpfolder"
     [ ! $? -eq 0 ] && echo "File '$path' exists, but it is not a valid .tar.gz" && exit 1
     filename="$(basename $path .tar.gz)"
+
+    file=$(find "${tmpfolder}" -name \*.pagedata)
+    link_templates "$tmpfolder" "$file"
 
 elif [ -d "$path" ]; then
     cp -r "$path"* "$tmpfolder"
@@ -196,10 +209,7 @@ elif [ -d "$path" ]; then
     # Fix empty lines in pagedata files
     sed -i -e "s/^[[:blank:]]*$/Blank/" "${tmpfolder}"/*.pagedata
 
-    while IFS= read -r tmpl
-    do
-        ln -s -f "$TEMPLATES_DIR"/"$tmpl".png "$tmpfolder"
-    done < "${tmpfolder}/${filename}.pagedata"
+    link_templates "$tmpfolder" "${tmpfolder}/${filename}.pagedata"
 
 else
     # Establish remote connection
@@ -289,6 +299,7 @@ else
 
     ${SSH_CMD} -O exit ${SSH_REMOTE}
 
+    link_templates "$tmpfolder" "${tmpfolder}/${OUTPUT_UUID}.pagedata"
 fi
 
 # Fix for single page notebooks with no template (empty pagedata file by default)
