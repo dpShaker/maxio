@@ -474,9 +474,24 @@ class Mechanical_Pencil(Pen):
     name = "Mechanical Pencil"
     def __init__(self, base_width, base_color, coloured_annotations = False):
         super().__init__(base_width, base_color)
-        self.base_width = self.base_width ** 2
-        self.base_opacity = 0.7
-        self.sharpen_threshold = 1.5
+        self.base_opacity = 0.9
+        self.sharpen_threshold = 0.1
+        self.segment_length = 3
+        self.base_color = stroke_colour[1]
+
+    def get_segment_width(self, speed, tilt, width, pressure, last_width):
+        segment_width = 0.6 * (pressure**2 * (self.base_width + width))
+        self.logger.debug(f"segment_width: Pressure: {pressure}; Speed: {speed}; Tilt: {tilt}; Width: {width}/{last_width} -> Segment Width: {segment_width}")
+        return segment_width
+
+    def get_segment_color(self, speed, tilt, width, pressure, last_width):
+        intensity = self.cutoff(pressure)
+        rev_intensity = abs(intensity - 1)
+        segment_color = (max(0, self.base_color.rgb[0] + rev_intensity * (1-self.base_color.rgb[0])),
+                         max(0, self.base_color.rgb[1] + rev_intensity * (1-self.base_color.rgb[1])),
+                         max(0, self.base_color.rgb[2] + rev_intensity * (1-self.base_color.rgb[2])))
+        self.logger.debug(f"segment_color: Pressure: {pressure} => Color: {segment_color}")
+        return segment_color
 
 
 class Brush(Pen):
