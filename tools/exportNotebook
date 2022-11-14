@@ -21,6 +21,7 @@ bad_args=""
 arg_num=0
 KEEP_TEMPDIR=""
 TEMPLATES_DIR=~/ownCloud/reMarkable/Templates
+REQUESTED_PAGES=""
 
 ###
 
@@ -77,6 +78,11 @@ while [[ $# -gt 0 ]]; do
             shift
             shift
             ;;
+        -p|--pages)
+            REQUESTED_PAGES="$2"
+            shift
+            shift
+            ;;
         -*)
             echo "Unknown option: $1"
             bad_args=TRUE
@@ -97,7 +103,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $bad_args == TRUE || $arg_num < 1 ]]; then
-    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--offset|-f FLOAT] [--skip_layers|-s value[,value]] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
+    echo "Usage: $(basename "$0") [--askrename|-n] [--remoteip|-r STR] [--strokewidth|-w FLOAT] [--opacity|-o FLOAT] [--offset|-f FLOAT] [--skip_layers|-s value[,value]] [--pages|-p page[,page]] [--coloured_annotations|-c] [--keep_tempdir|-k] [--templates|-t STR] <document-name-match|tar.gz-file>"
     exit 1
 fi
 
@@ -349,7 +355,12 @@ if [ -f "${tmpfolder}"/*.pdf ]; then
 else
 
     # Generate a PDF file out of the templates
-    sed -e "s|^|\"${tmpfolder}\"/\"|" -e 's|$|.png"|' "${tmpfolder}"/*.pagedata | tr '\n' ' ' | sed -e "s|$|-transparent white \"${tmpfolder}\"/background.pdf|" | xargs convert
+    if [ "$REQUESTED_PAGES" != "" ]; then
+        t=$(sed -e "s|^|\"${tmpfolder}\"/\"|" -e 's|$|.png"|' "${tmpfolder}"/*.pagedata | sed -n ${REQUESTED_PAGES//,/p;}p | tr '\n' ' ')
+    else
+        t=$(sed -e "s|^|\"${tmpfolder}\"/\"|" -e 's|$|.png"|' "${tmpfolder}"/*.pagedata | tr '\n' ' ')
+    fi
+    echo $t | sed -e "s|$| -transparent white \"${tmpfolder}\"/background.pdf|" | xargs convert
     [ ! $? -eq 0 ] && echo "Failed to generate a PDF file out of the templates" && exit 1
 fi
 
@@ -358,6 +369,12 @@ IPAGE=0
 jq '.pages' "${tmpfolder}"/*.content | jq '.[]' | while read -r page; do
     SPAGE="${page:1:${#page}-2}"
     let IPAGE=IPAGE+1
+    if [ "$REQUESTED_PAGES" != "" ]; then
+        if ! [[ ",$REQUESTED_PAGES," == *",$IPAGE,"* ]]; then
+            echo "Skipping page $IPAGE ($SPAGE)"
+            continue
+        fi
+    fi
     if [ -f "${tmpfolder}"/*/"${SPAGE}.rm" ]; then
         echo "Processing page $IPAGE ($SPAGE)"
         $rM2svg_cmd --input "${tmpfolder}"/*/"${SPAGE}.rm" --output "${tmpfolder}/foreground$(printf %03d $IPAGE).svg"
