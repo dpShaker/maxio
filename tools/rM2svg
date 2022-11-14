@@ -348,7 +348,7 @@ class Pen:
         segment_color = self.base_color.rgb
         segment_opacity = self.base_opacity
 
-        if all([speed, tilt, pressure, last_width]):
+        if not None in (speed, tilt, pressure, last_width):
             segment_color = self.get_segment_color(speed, tilt, width, pressure, last_width)
             segment_width = self.get_segment_width(speed, tilt, width, pressure, last_width)
             segment_opacity = self.get_segment_opacity(speed, tilt, width, pressure, last_width)
@@ -363,7 +363,7 @@ class Pen:
         return self.base_width
 
     def get_segment_color(self, speed, tilt, width, pressure, last_width):
-        return tuple(map(lambda x: x*255, self.base_color.rgb))
+        return self.base_color.rgb
 
     def get_segment_opacity(self, speed, tilt, width, pressure, last_width):
         return self.base_opacity
